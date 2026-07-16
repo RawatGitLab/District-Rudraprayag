@@ -274,7 +274,7 @@ export default function App() {
       return {
         id: `layer-${index}-${name.replace(/\s+/g, '-')}`,
         name: name,
-        visible: name === "District-Boundary" || name === "Landuse-Agriculture",
+        visible: lowerName === "district-boundary" || lowerName === "district_boundary",
         type: type,
         color: color,
         fillColor: fillColor,
@@ -336,8 +336,16 @@ export default function App() {
     setHoveredFeature(null);
     setMeasureMode("none");
     setMeasurePoints([]);
-    // Simple state refresh to reset sliders or zoom
-    setLayers((prev) => prev.map((l) => ({ ...l, visible: true, opacity: l.type === "polygon" && l.name.toLowerCase().includes("tehsil") ? 0.85 : 0.9 })));
+    // Reset layer visibility to only District Boundary active
+    setLayers((prev) => prev.map((l) => {
+      const lowerName = l.name.toLowerCase();
+      const isDistrictBoundary = lowerName === "district-boundary" || lowerName === "district_boundary";
+      return {
+        ...l,
+        visible: isDistrictBoundary,
+        opacity: l.type === "polygon" && l.name.toLowerCase().includes("tehsil") ? 0.85 : 0.9
+      };
+    }));
   };
 
   const toggleAllLayers = (visible: boolean) => {

@@ -26,7 +26,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Map & Interaction state
-  const [activeBaseMap, setActiveBaseMap] = useState<string>("osm");
+  const [activeBaseMap, setActiveBaseMap] = useState<string>("satellite");
   const [selectedFeature, setSelectedFeature] = useState<GisFeature | null>(null);
   const [hoveredFeature, setHoveredFeature] = useState<GisFeature | null>(null);
   const [isTableCollapsed, setIsTableCollapsed] = useState<boolean>(true);
@@ -174,6 +174,18 @@ export default function App() {
     }
   };
 
+  // Helper to convert HSL colors to standard Hexadecimal strings for color inputs
+  const hslToHex = (h: number, s: number, l: number): string => {
+    const lAdjusted = l / 100;
+    const a = (s * Math.min(lAdjusted, 1 - lAdjusted)) / 100;
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const colorVal = lAdjusted - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * colorVal).toString(16).padStart(2, "0");
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  };
+
   // Analyze features to identify unique layers, geometry types, and assign aesthetic styling
   const buildLayerConfiguration = (loadedFeatures: GisFeature[]) => {
     const layerCounts: Record<string, number> = {};
@@ -226,6 +238,8 @@ export default function App() {
 
     const configuration: LayerConfig[] = layerNames.map((name, index) => {
       const type = layerTypes[name] || "unknown";
+      const isPolygon = type === "polygon";
+      const isLine = type === "linestring";
       
       // Determine elegant theme coloring based on standard GIS mapping schemas
       let color = "#6366f1"; // default indigo
@@ -235,46 +249,48 @@ export default function App() {
       let fillOpacity = 0.4;
 
       const lowerName = name.toLowerCase();
-      if (lowerName.includes("village")) {
+
+      if (isPolygon) {
+        // "Make All Polygon layer hollow no fill, only add boundary colour with white."
+        color = "#ffffff";
+        fillColor = "transparent";
+        weight = 2.5;
+        opacity = 1.0;
+        fillOpacity = 0;
+      } else if (lowerName.includes("river") || lowerName.includes("canal") || lowerName.includes("water")) {
+        color = "#0ea5e9"; // stream sky blue
+        fillColor = "transparent";
+        weight = 2.5;
+        opacity = 1.0;
+        fillOpacity = 0;
+      } else if (lowerName.includes("road") || isLine) {
+        color = "#f97316"; // orange roads / other line geometries
+        fillColor = "transparent";
+        weight = 2.0;
+        opacity = 1.0;
+        fillOpacity = 0;
+      } else if (lowerName.includes("village")) {
         color = "#ec4899"; // bright pink villages selector
         fillColor = "#f472b6";
         weight = 1.5;
         opacity = 0.95;
-      } else if (lowerName.includes("river") || lowerName.includes("canal") || lowerName.includes("water")) {
-        color = "#0ea5e9"; // stream sky blue
-        fillColor = "#38bdf8";
-        weight = 2.5;
-        opacity = 1.0;
-        fillOpacity = 0.1;
-      } else if (lowerName.includes("district") || lowerName.includes("boundary")) {
-        color = "#a16207"; // Golden brown outline
-        fillColor = "#fbbf24"; // Mustard polygon fill
-        weight = 2.5;
-        opacity = 0.9;
-        fillOpacity = 0.55; // Solid background core
-      } else if (lowerName.includes("block")) {
-        color = "#c2410c"; // Rust dark
-        fillColor = "#fdba74"; // Peach block
-        weight = 2.0;
-        opacity = 0.8;
-        fillOpacity = 0.25;
-      } else if (lowerName.includes("tehsil") || lowerName.includes("tahsil")) {
-        color = "#15803d"; // Deep forest green
-        fillColor = "#86efac"; // Mint tehsil
-        weight = 2.0;
-        opacity = 0.85;
-        fillOpacity = 0.3;
+        fillOpacity = 0.7;
       } else {
-        // Dynamic palette for any other shapefile imported
+        // Dynamic palette for any other point/shapefile imported
         const hue = (index * 137.5) % 360; 
-        color = `hsl(${hue}, 70%, 45%)`;
-        fillColor = `hsl(${hue}, 70%, 65%)`;
+        color = hslToHex(hue, 70, 50);
+        fillColor = hslToHex(hue, 70, 65);
       }
+
+      const isDistrictBoundary = 
+        lowerName === "district-boundary" || 
+        lowerName === "district_boundary" || 
+        lowerName === "district boundary";
 
       return {
         id: `layer-${index}-${name.replace(/\s+/g, '-')}`,
         name: name,
-        visible: lowerName === "district-boundary" || lowerName === "district_boundary",
+        visible: isDistrictBoundary, // Only activate district boundary, rest deactivated at start
         type: type,
         color: color,
         fillColor: fillColor,
